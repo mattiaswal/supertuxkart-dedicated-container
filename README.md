@@ -1,100 +1,67 @@
-# SuperTuxKart Docker Container
+# SuperTuxKart Dedicated Server Container
 
-Docker container to run SuperTuxKart on headless embedded systems. This container is designed for systems that have graphics drivers but are not running X11 - it brings its own X server.
+Docker container to run a SuperTuxKart dedicated server. This is a server-only build without graphics, designed to host multiplayer games.
 
 ## Purpose
 
-This container is intended for headless systems with:
-- Graphics hardware and drivers (DRM/KMS support)
-- No existing X11 installation
-- Direct hardware access capabilities
-
-The container provides its own X11 server and graphics stack, making it perfect for embedded systems, kiosks, or headless servers that need to display graphics directly to connected displays.
+This container runs a headless SuperTuxKart server for multiplayer gaming. It's built with `SERVER_ONLY=ON` and includes no graphics dependencies.
 
 ## Building
 
-Build the container and create OCI archive:
+Build the container for multiple platforms (linux/aarch64, linux/amd64):
 ```bash
-make
+make build
 ```
 
-Other build options:
-- `make build` - Build Docker image only
-- `make clean` - Remove image and archive
+This will build and push the image to Docker Hub. To clean up:
+```bash
+make clean
+```
 
 ## Running
 
-### Basic Usage
+### Basic Docker Usage
 
 ```bash
-docker run --privileged \
-  -m type=bind,source=/run/udev/,target=/run/udev/ \
-  -v :/var \
-  mattiaswal/supertuxkart:latest
+docker run -d \
+  -p 2759:2759/udp \
+  -v $(pwd)/server_config.xml:/stk-data/server_config.xml \
+  mattiaswal/supertuxkart-dedicated:latest
 ```
+
+You need to provide a `server_config.xml` file for server configuration.
 
 ### Infix Configuration
 
-For use with [Infix](https://github.com/kernelkit/infix) on
-e.g. Raspberry Pi 4
+For use with [Infix](https://kernelkit.org/infix/latest/container/) on embedded systems like Raspberry Pi 4:
 
-```json
-
-{
-  "infix-containers:containers": {
-    "container": [
-      {
-        "name": "stk",
-        "image": "oci-archive:/var/lib/oci/supertuxkart-oci.tar",
-        "privileged": true,
-        "network": {
-          "host": true
-        },
-        "mount": [
-          {
-            "name": "dbus",
-            "type": "bind",
-            "source": "/run/dbus/",
-            "target": "/run/dbus/"
-          },
-          {
-            "name": "udev",
-            "type": "bind",
-            "source": "/run/udev/",
-            "target": "/run/udev/"
-          }
-        ],
-        "volume": [
-          {
-            "name": "games",
-            "target": "/usr/share/games"
-          },
-          {
-            "name": "var",
-            "target": "/var"
-          }
-        ]
-      }
-    ]
-  }
-}
+```bash
+admin@infix:/> configure
+admin@infix:/config/> edit container stk-server
+admin@infix:/config/container/stk-server/> set image docker://mattiaswal/supertuxkart-dedicated:latest
+admin@infix:/config/container/stk-server/> set network host
+admin@infix:/config/container/stk-server/> set publish 2759:2759/udp
+admin@infix:/config/container/stk-server/> edit mount stk-data
+admin@infix:/config/container/stk-server/mount/stk-data/> set source /cfg/stk-data
+admin@infix:/config/container/stk-server/mount/stk-data/> set target /stk-data
+admin@infix:/config/container/stk-server/mount/stk-data/> end
+admin@infix:/config/container/stk-server/> leave
+admin@infix:/> copy running-config startup-config
 ```
 
-Connect a USB mouse and keyboard to start playing SuperTuxKart.
+Place your `server_config.xml` in `/cfg/stk-data/` on the Infix host.
 
 ## Requirements
 
-- Docker with buildx support
-- ARM64 platform support for target deployment
-- Graphics hardware with DRM/KMS drivers
-- No existing X11 server (container provides its own)
-- USB input devices (mouse/keyboard)
+- Docker with buildx support (for building)
+- Network connectivity for players to connect
+- Valid `server_config.xml` configuration file
 
-## Configuration
+## What's Included
 
 The container includes:
-- Self-contained X11 server
-- Mesa graphics drivers and EGL support
-- Custom display configuration with rotation support
-- Power management disabled for continuous operation
-- Optimized for embedded systems without desktop environments
+- SuperTuxKart dedicated server (server-only build)
+- Built from latest STK source code
+- Minimal Alpine Linux base image
+- Non-root user for security
+- Support for ARM64 and AMD64 platforms
